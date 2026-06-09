@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>3PT Control Panel</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%;
+    background: #0d0f15;
+    color: #fff;
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 16px 28px;
+    max-width: 520px;
+    margin: 0 auto;
+    min-height: 100%;
+  }
+
+  .header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .header h1 {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #ff9d3d;
+  }
+  #conn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #9aa0ad;
+  }
+  #dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #888; transition: background 0.3s;
+  }
+  #dot.live { background: #3ad17a; box-shadow: 0 0 8px #3ad17a; }
+  #dot.waiting { background: #d1a23a; }
+  #dot.down { background: #d13a3a; }
+
+  /* Live count card */
+  .card {
+    width: 100%;
+    background: #161a23;
+    border: 1px solid #262c39;
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 18px;
+  }
+  #makes { font-size: 72px; font-weight: 900; line-height: 1; }
+  #attempts { font-size: 20px; font-weight: 700; color: #9aa0ad; margin-top: 2px; }
+  #pct { font-size: 26px; font-weight: 800; color: #ff9d3d; margin-top: 8px; }
+  #goal { font-size: 14px; color: #6b7280; margin-top: 6px; letter-spacing: 1px; }
+
+  /* Big action buttons */
+  .row { width: 100%; display: flex; gap: 12px; margin-bottom: 12px; }
+  button {
+    border: none; border-radius: 14px; color: #fff;
+    font-weight: 800; cursor: pointer; font-family: inherit;
+    transition: transform 0.05s, filter 0.15s;
+    user-select: none;
+  }
+  button:active { transform: scale(0.96); filter: brightness(1.15); }
+
+  .big { flex: 1; padding: 30px 0; font-size: 26px; letter-spacing: 1px; }
+  #makeBtn { background: linear-gradient(180deg, #2faa55, #1f8a43); }
+  #missBtn { background: linear-gradient(180deg, #c44, #a33); }
+  #undoBtn { width: 100%; padding: 16px 0; font-size: 18px; background: #333a49; }
+
+  /* Safety / override section */
+  details {
+    width: 100%; margin-top: 10px;
+    background: #12151d; border: 1px solid #262c39; border-radius: 12px;
+    padding: 4px 14px;
+  }
+  summary {
+    cursor: pointer; padding: 12px 0; font-size: 14px; font-weight: 700;
+    color: #9aa0ad; letter-spacing: 1px;
+  }
+  .setrow { display: flex; gap: 10px; align-items: center; padding: 8px 0 14px; }
+  .setrow label { flex: 1; font-size: 14px; color: #c8ccd6; }
+  .setrow input {
+    width: 84px; padding: 10px; font-size: 16px; text-align: center;
+    border-radius: 8px; border: 1px solid #333a49; background: #0d0f15; color: #fff;
+  }
+  .setrow button { padding: 10px 16px; font-size: 14px; background: #ff7a18; }
+
+  .note {
+    margin-top: 16px; font-size: 12px; color: #6b7280; text-align: center; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>3PT Control</h1>
+    <div id="conn"><span id="dot" class="waiting"></span><span id="connText">connecting…</span></div>
+  </div>
+
+  <div class="card">
+    <div id="makes">–</div>
+    <div id="attempts">/ – attempts</div>
+    <div id="pct">–%</div>
+    <div id="goal">0 / 100 makes</div>
+  </div>
+
+  <div class="row">
+    <button id="makeBtn" class="big">MAKE ✓</button>
+    <button id="missBtn" class="big">MISS ✗</button>
+  </div>
+  <div class="row">
+    <button id="undoBtn">↶ UNDO LAST</button>
+  </div>
+
+  <details>
+    <summary>⚙ Safety override (if the count drifts)</summary>
+    <div class="setrow">
+      <label>Set makes to</label>
+      <input id="setMakesInput" type="number" min="0" inputmode="numeric">
+      <button id="setMakesBtn">Set</button>
+    </div>
+    <div class="setrow">
+      <label>Set misses to</label>
+      <input id="setMissesInput" type="number" min="0" inputmode="numeric">
+      <button id="setMissesBtn">Set</button>
+    </div>
+  </details>
+
+  <div class="note">
+    Buttons control the live overlay through a relay. The count shown here mirrors
+    the overlay — if it doesn't move when you tap, the overlay may be offline.
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var GOAL = 100;
+  var CMD_TOPIC = "whisqey3pt-cmd-9f3kq7x2";
+  var STATE_TOPIC = "whisqey3pt-state-9f3kq7x2";
+
+  var elMakes = document.getElementById("makes");
+  var elAttempts = document.getElementById("attempts");
+  var elPct = document.getElementById("pct");
+  var elGoal = document.getElementById("goal");
+  var elDot = document.getElementById("dot");
+  var elConnText = document.getElementById("connText");
+
+  var haveState = false;
+
+  // ---- Display whatever the overlay reports ----
+  function applyState(makes, attempts) {
+    haveState = true;
+    elMakes.textContent = String(makes);
+    elAttempts.textContent = "/ " + attempts + " attempts";
+    var pct = attempts > 0 ? (makes / attempts) * 100 : 0;
+    elPct.textContent = pct.toFixed(1) + "%";
+    elGoal.textContent = makes + " / " + GOAL + " makes";
+  }
+
+  function setConn(state, text) {
+    elDot.className = state;
+    elConnText.textContent = text;
+  }
+
+  // ---- Send a command to the overlay ----
+  function send(cmd) {
+    fetch("https://ntfy.sh/" + CMD_TOPIC, { method: "POST", body: cmd })
+      .catch(function () {});
+  }
+
+  document.getElementById("makeBtn").onclick = function () { send("!make"); };
+  document.getElementById("missBtn").onclick = function () { send("!miss"); };
+  document.getElementById("undoBtn").onclick = function () { send("!undo"); };
+
+  document.getElementById("setMakesBtn").onclick = function () {
+    var v = document.getElementById("setMakesInput").value;
+    if (v !== "" && Number(v) >= 0) send("setmakes:" + parseInt(v, 10));
+  };
+  document.getElementById("setMissesBtn").onclick = function () {
+    var v = document.getElementById("setMissesInput").value;
+    if (v !== "" && Number(v) >= 0) send("setmisses:" + parseInt(v, 10));
+  };
+
+  // ---- Read current state from the overlay ----
+  function parseStateMessage(msgStr) {
+    try {
+      var st = JSON.parse(msgStr);
+      if (typeof st.makes === "number" && typeof st.attempts === "number") {
+        applyState(st.makes, st.attempts);
+      }
+    } catch (e) {}
+  }
+
+  // One-time poll on load so we show the current count immediately.
+  fetch("https://ntfy.sh/" + STATE_TOPIC + "/json?poll=1&since=all")
+    .then(function (r) { return r.text(); })
+    .then(function (t) {
+      var lines = t.split("\n");
+      var last = null;
+      for (var i = 0; i < lines.length; i++) {
+        if (!lines[i]) continue;
+        try { var o = JSON.parse(lines[i]); if (o.event === "message") last = o.message; } catch (e) {}
+      }
+      if (last) parseStateMessage(last);
+    })
+    .catch(function () {});
+
+  // Live updates.
+  var ws = null;
+  var delay = 1000;
+  function connect() {
+    ws = new WebSocket("wss://ntfy.sh/" + STATE_TOPIC + "/ws");
+    ws.onopen = function () {
+      delay = 1000;
+      setConn(haveState ? "live" : "waiting", haveState ? "live" : "waiting for overlay…");
+    };
+    ws.onmessage = function (event) {
+      var o;
+      try { o = JSON.parse(event.data); } catch (e) { return; }
+      if (o.event !== "message") return;
+      parseStateMessage(o.message);
+      setConn("live", "live");
+    };
+    ws.onclose = function () {
+      setConn("down", "reconnecting…");
+      setTimeout(connect, delay);
+      delay = Math.min(delay * 2, 30000);
+    };
+    ws.onerror = function () { try { ws.close(); } catch (e) {} };
+  }
+  connect();
+})();
+</script>
+</body>
+</html>

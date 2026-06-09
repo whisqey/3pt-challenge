@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3PT Challenge Overlay</title>
+<style>
+  :root {
+    --goal: 100;
+    --orange: #ff7a18;
+    --orange-bright: #ff9d3d;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+  }
+
+  /* Panel positioned bottom-center */
+  #panel {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 620px;
+    padding: 28px 36px 32px;
+    background: rgba(12, 14, 20, 0.82);
+    border: 2px solid rgba(255, 122, 24, 0.55);
+    border-radius: 18px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+    color: #fff;
+    text-align: center;
+  }
+
+  #title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--orange-bright);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+    margin-bottom: 14px;
+  }
+
+  /* Big number row */
+  #scoreRow {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 4px;
+  }
+
+  #makes {
+    font-size: 96px;
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 3px 10px rgba(0, 0, 0, 0.9);
+  }
+
+  #attempts {
+    font-size: 30px;
+    font-weight: 700;
+    color: #c8ccd6;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  }
+
+  #pct {
+    font-size: 34px;
+    font-weight: 800;
+    color: var(--orange-bright);
+    margin-bottom: 18px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  }
+
+  /* Progress bar */
+  #barOuter {
+    width: 100%;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  #barInner {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--orange), var(--orange-bright));
+    border-radius: 14px;
+    transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 14px rgba(255, 122, 24, 0.7);
+  }
+
+  #progressLabel {
+    margin-top: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #e6e8ee;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  }
+
+  /* Milestone banner */
+  #milestone {
+    position: absolute;
+    top: -64px;
+    left: 50%;
+    transform: translateX(-50%) scale(0.8);
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #fff;
+    background: linear-gradient(90deg, var(--orange), var(--orange-bright));
+    padding: 10px 28px;
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(255, 122, 24, 0.8);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #milestone.show {
+    animation: milestonePop 3.2s ease forwards;
+  }
+
+  @keyframes milestonePop {
+    0%   { opacity: 0; transform: translateX(-50%) scale(0.6) translateY(10px); }
+    12%  { opacity: 1; transform: translateX(-50%) scale(1.08) translateY(0); }
+    20%  { transform: translateX(-50%) scale(1.0); }
+    85%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
+    100% { opacity: 0; transform: translateX(-50%) scale(0.9) translateY(-8px); }
+  }
+
+  /* Panel flash/glow effects */
+  #panel.flash {
+    animation: flashGlow 1.6s ease;
+  }
+  @keyframes flashGlow {
+    0%, 100% { box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6); border-color: rgba(255, 122, 24, 0.55); }
+    25%      { box-shadow: 0 0 60px rgba(255, 157, 61, 0.9); border-color: var(--orange-bright); }
+  }
+
+  #panel.bigCelebrate {
+    animation: bigCelebrate 4s ease;
+  }
+  @keyframes bigCelebrate {
+    0%, 100% { box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6); border-color: rgba(255, 122, 24, 0.55); transform: translateX(-50%) scale(1); }
+    10%      { box-shadow: 0 0 80px rgba(255, 200, 80, 1); border-color: #ffd24d; transform: translateX(-50%) scale(1.04); }
+    20%      { transform: translateX(-50%) scale(1); }
+    30%      { box-shadow: 0 0 80px rgba(255, 200, 80, 1); transform: translateX(-50%) scale(1.03); }
+    40%      { transform: translateX(-50%) scale(1); }
+    50%      { box-shadow: 0 0 80px rgba(255, 200, 80, 1); }
+  }
+
+  /* Connection status dot (small, corner) */
+  #status {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #888;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  }
+  #status.connected { background: #3ad17a; box-shadow: 0 0 8px #3ad17a; }
+  #status.disconnected { background: #d13a3a; box-shadow: 0 0 8px #d13a3a; }
+</style>
+</head>
+<body>
+  <div id="panel">
+    <div id="status" class="disconnected" title="Twitch connection"></div>
+    <div id="milestone"></div>
+    <div id="title">3PT Challenge</div>
+    <div id="scoreRow">
+      <span id="makes">0</span>
+      <span id="attempts">/ 0 attempts</span>
+    </div>
+    <div id="pct">0.0%</div>
+    <div id="barOuter"><div id="barInner"></div></div>
+    <div id="progressLabel">0 / 100 makes</div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Config ----
+  var CHANNEL = "whisqey";
+  var GOAL = 100;
+
+  // ntfy relay topics (control panel <-> overlay). The token is a shared secret.
+  // Panel sends commands on CMD_TOPIC; overlay broadcasts its state on STATE_TOPIC.
+  var CMD_TOPIC = "whisqey3pt-cmd-9f3kq7x2";
+  var STATE_TOPIC = "whisqey3pt-state-9f3kq7x2";
+
+  // ---- State ----
+  var makes = 0;
+  var attempts = 0;
+  var history = []; // stack of {makes, attempts} snapshots BEFORE each action, for undo
+  var firedMilestones = {}; // track which milestones already fired
+
+  // ---- DOM ----
+  var elMakes = document.getElementById("makes");
+  var elAttempts = document.getElementById("attempts");
+  var elPct = document.getElementById("pct");
+  var elBar = document.getElementById("barInner");
+  var elProgress = document.getElementById("progressLabel");
+  var elMilestone = document.getElementById("milestone");
+  var elPanel = document.getElementById("panel");
+  var elStatus = document.getElementById("status");
+
+  // ---- Render ----
+  function render() {
+    elMakes.textContent = String(makes);
+    elAttempts.textContent = "/ " + attempts + " attempts";
+
+    var pct = attempts > 0 ? (makes / attempts) * 100 : 0;
+    elPct.textContent = pct.toFixed(1) + "%";
+
+    var fill = Math.max(0, Math.min(100, (makes / GOAL) * 100));
+    elBar.style.width = fill + "%";
+
+    elProgress.textContent = makes + " / " + GOAL + " makes";
+  }
+
+  // ---- Milestones ----
+  var MILESTONES = {
+    25:  { text: "QUARTER WAY", type: "flash" },
+    50:  { text: "HALFWAY THERE", type: "big" },
+    75:  { text: "75 DOWN!", type: "flash" },
+    100: { text: "CHALLENGE COMPLETE", type: "celebrate" }
+  };
+
+  function checkMilestones() {
+    var cfg = MILESTONES[makes];
+    if (cfg && !firedMilestones[makes]) {
+      firedMilestones[makes] = true;
+      triggerMilestone(cfg);
+    }
+  }
+
+  function triggerMilestone(cfg) {
+    elMilestone.textContent = cfg.text;
+    // restart animation
+    elMilestone.classList.remove("show");
+    void elMilestone.offsetWidth;
+    elMilestone.classList.add("show");
+
+    var cls = cfg.type === "celebrate" ? "bigCelebrate" : "flash";
+    elPanel.classList.remove("flash", "bigCelebrate");
+    void elPanel.offsetWidth;
+    elPanel.classList.add(cls);
+  }
+
+  // ---- Actions ----
+  function pushHistory() {
+    history.push({ makes: makes, attempts: attempts });
+    if (history.length > 100) history.shift();
+  }
+
+  function doMake() {
+    pushHistory();
+    makes += 1;
+    attempts += 1;
+    render();
+    checkMilestones();
+  }
+
+  function doMiss() {
+    pushHistory();
+    attempts += 1;
+    render();
+  }
+
+  function doUndo() {
+    if (history.length === 0) return;
+    var prev = history.pop();
+    makes = prev.makes;
+    attempts = prev.attempts;
+    // allow milestones to re-fire if we dropped below them
+    for (var key in firedMilestones) {
+      if (makes < Number(key)) delete firedMilestones[key];
+    }
+    render();
+  }
+
+  function doSetMakes(val) {
+    pushHistory();
+    makes = val;
+    if (attempts < makes) attempts = makes; // keep attempts >= makes
+    refreshMilestoneState();
+    render();
+  }
+
+  function doSetMisses(val) {
+    pushHistory();
+    // misses = attempts - makes  =>  attempts = makes + misses
+    attempts = makes + val;
+    render();
+  }
+
+  function refreshMilestoneState() {
+    // mark milestones at or below current makes as already fired (no replay on manual set)
+    for (var m in MILESTONES) {
+      if (Number(m) <= makes) firedMilestones[m] = true;
+      else delete firedMilestones[m];
+    }
+  }
+
+  // ---- Command parsing ----
+  function handleCommand(text) {
+    var msg = text.trim();
+    var lower = msg.toLowerCase();
+    var acted = true;
+
+    if (lower === "!make") { doMake(); }
+    else if (lower === "!miss") { doMiss(); }
+    else if (lower === "!undo") { doUndo(); }
+    else if (/^setmakes:\s*(\d+)$/.test(lower)) { doSetMakes(parseInt(lower.match(/^setmakes:\s*(\d+)$/)[1], 10)); }
+    else if (/^setmisses:\s*(\d+)$/.test(lower)) { doSetMisses(parseInt(lower.match(/^setmisses:\s*(\d+)$/)[1], 10)); }
+    else { acted = false; }
+
+    // After any real change, push the new state out so the control panel mirrors it.
+    if (acted) broadcastState();
+  }
+
+  // ---- IRC tag parsing ----
+  function parseTags(tagStr) {
+    var tags = {};
+    if (!tagStr) return tags;
+    var parts = tagStr.split(";");
+    for (var i = 0; i < parts.length; i++) {
+      var kv = parts[i].split("=");
+      tags[kv[0]] = kv.length > 1 ? kv[1] : "";
+    }
+    return tags;
+  }
+
+  function isMod(tags, username) {
+    if (tags.mod === "1") return true;
+    // broadcaster is implicitly a mod
+    if (tags.badges && tags.badges.indexOf("broadcaster/") !== -1) return true;
+    if (username && username.toLowerCase() === CHANNEL.toLowerCase()) return true;
+    return false;
+  }
+
+  // ---- Twitch IRC connection ----
+  var ws = null;
+  var reconnectDelay = 1000;
+
+  function setStatus(state) {
+    elStatus.className = state;
+  }
+
+  function connect() {
+    setStatus("disconnected");
+    ws = new WebSocket("wss://irc-ws.chat.twitch.tv:443");
+
+    ws.onopen = function () {
+      // Anonymous read-only login
+      ws.send("CAP REQ :twitch.tv/tags twitch.tv/commands");
+      ws.send("PASS SCHMOOPIIE");
+      ws.send("NICK justinfan" + Math.floor(Math.random() * 80000 + 1000));
+      ws.send("JOIN #" + CHANNEL);
+      reconnectDelay = 1000;
+      setStatus("connected");
+    };
+
+    ws.onmessage = function (event) {
+      var lines = event.data.split("\r\n");
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (!line) continue;
+        handleLine(line);
+      }
+    };
+
+    ws.onclose = function () {
+      setStatus("disconnected");
+      scheduleReconnect();
+    };
+
+    ws.onerror = function () {
+      try { ws.close(); } catch (e) {}
+    };
+  }
+
+  function scheduleReconnect() {
+    setTimeout(connect, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+  }
+
+  function handleLine(line) {
+    // Respond to PING to keep alive
+    if (line.indexOf("PING") === 0) {
+      ws.send("PONG :tmi.twitch.tv");
+      return;
+    }
+
+    // Optional leading @tags
+    var tagStr = null;
+    var rest = line;
+    if (line.charAt(0) === "@") {
+      var sp = line.indexOf(" ");
+      tagStr = line.substring(1, sp);
+      rest = line.substring(sp + 1);
+    }
+
+    if (rest.indexOf("PRIVMSG") === -1) return;
+
+    // rest: :user!user@user.tmi.twitch.tv PRIVMSG #channel :message
+    var tags = parseTags(tagStr);
+
+    var username = null;
+    var bang = rest.indexOf("!");
+    if (rest.charAt(0) === ":" && bang !== -1) {
+      username = rest.substring(1, bang);
+    }
+
+    var msgIdx = rest.indexOf("PRIVMSG");
+    var colonIdx = rest.indexOf(":", msgIdx);
+    if (colonIdx === -1) return;
+    var message = rest.substring(colonIdx + 1);
+
+    if (!isMod(tags, username)) return; // silently ignore non-mods
+
+    handleCommand(message);
+  }
+
+  // ---- ntfy relay: commands in (from panel), state out (to panel) ----
+  function broadcastState() {
+    fetch("https://ntfy.sh/" + STATE_TOPIC, {
+      method: "POST",
+      body: JSON.stringify({ makes: makes, attempts: attempts })
+    }).catch(function () {});
+  }
+
+  function recoverState() {
+    // On load, pull the last broadcast state so an overlay reload keeps the count.
+    fetch("https://ntfy.sh/" + STATE_TOPIC + "/json?poll=1&since=all")
+      .then(function (r) { return r.text(); })
+      .then(function (t) {
+        var lines = t.split("\n");
+        var last = null;
+        for (var i = 0; i < lines.length; i++) {
+          if (!lines[i]) continue;
+          try {
+            var o = JSON.parse(lines[i]);
+            if (o.event === "message") last = o.message;
+          } catch (e) {}
+        }
+        if (!last) return;
+        try {
+          var st = JSON.parse(last);
+          if (typeof st.makes === "number" && typeof st.attempts === "number") {
+            makes = st.makes;
+            attempts = st.attempts;
+            refreshMilestoneState(); // adopt without replaying milestone animations
+            render();
+          }
+        } catch (e) {}
+      })
+      .catch(function () {});
+  }
+
+  var ntfyWs = null;
+  var ntfyDelay = 1000;
+
+  function connectNtfy() {
+    ntfyWs = new WebSocket("wss://ntfy.sh/" + CMD_TOPIC + "/ws");
+
+    ntfyWs.onopen = function () { ntfyDelay = 1000; };
+
+    ntfyWs.onmessage = function (event) {
+      var o;
+      try { o = JSON.parse(event.data); } catch (e) { return; }
+      if (o.event !== "message") return;
+      // Commands from the panel are pre-trusted (the topic name is the secret).
+      handleCommand(o.message);
+    };
+
+    ntfyWs.onclose = function () {
+      setTimeout(connectNtfy, ntfyDelay);
+      ntfyDelay = Math.min(ntfyDelay * 2, 30000);
+    };
+
+    ntfyWs.onerror = function () {
+      try { ntfyWs.close(); } catch (e) {}
+    };
+  }
+
+  // ---- Test mode (only active with ?test in the URL; invisible in production) ----
+  function testJump(n) {
+    // simulate ~75% shooting so the % and bar look realistic at the jump point
+    makes = n;
+    attempts = Math.max(n, Math.round(n / 0.75));
+    refreshMilestoneState();
+    render();
+  }
+
+  function setupTestMode() {
+    var bar = document.createElement("div");
+    bar.id = "testBar";
+    bar.style.cssText =
+      "position:fixed;top:0;left:0;right:0;display:flex;flex-wrap:wrap;gap:8px;" +
+      "align-items:center;justify-content:center;padding:10px;z-index:9999;" +
+      "background:rgba(0,0,0,0.85);font-family:Arial,sans-serif;";
+
+    function btn(label, fn) {
+      var b = document.createElement("button");
+      b.textContent = label;
+      b.style.cssText =
+        "padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;" +
+        "border:none;border-radius:6px;background:#ff7a18;color:#fff;";
+      b.onclick = fn;
+      return b;
+    }
+
+    bar.appendChild(btn("Make (+1)", doMake));
+    bar.appendChild(btn("Miss", doMiss));
+    bar.appendChild(btn("Undo", doUndo));
+
+    // jump to one-below each milestone so a single "Make" triggers that milestone
+    bar.appendChild(btn("→ 24", function () { testJump(24); }));
+    bar.appendChild(btn("→ 49", function () { testJump(49); }));
+    bar.appendChild(btn("→ 74", function () { testJump(74); }));
+    bar.appendChild(btn("→ 99", function () { testJump(99); }));
+
+    bar.appendChild(btn("Reset", function () {
+      makes = 0; attempts = 0; history = []; firedMilestones = {}; render();
+    }));
+
+    var note = document.createElement("span");
+    note.textContent = "TEST MODE";
+    note.style.cssText = "color:#888;font-size:12px;font-weight:700;letter-spacing:1px;";
+    bar.appendChild(note);
+
+    document.body.appendChild(bar);
+  }
+
+  var TEST_MODE = /[?&]test\b/.test(location.search) || location.hash === "#test";
+
+  // ---- Init ----
+  render();
+  if (TEST_MODE) {
+    setupTestMode();
+  } else {
+    recoverState();
+    connect();      // Twitch chat (backup input)
+    connectNtfy();  // control panel relay (primary input)
+  }
+})();
+</script>
+</body>
+</html>
