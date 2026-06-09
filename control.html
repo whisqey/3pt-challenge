@@ -162,15 +162,30 @@
   var elConnText = document.getElementById("connText");
 
   var haveState = false;
+  var makes = 0;      // panel-local copy; reconciled to the overlay's broadcasts
+  var attempts = 0;
 
-  // ---- Display whatever the overlay reports ----
-  function applyState(makes, attempts) {
-    haveState = true;
+  function render() {
     elMakes.textContent = String(makes);
     elAttempts.textContent = "/ " + attempts + " attempts";
     var pct = attempts > 0 ? (makes / attempts) * 100 : 0;
     elPct.textContent = pct.toFixed(1) + "%";
     elGoal.textContent = makes + " / " + GOAL + " makes";
+  }
+
+  // Authoritative state from the overlay always wins (corrects any optimistic drift).
+  function applyState(m, a) {
+    haveState = true;
+    makes = m;
+    attempts = a;
+    render();
+  }
+
+  // Snappy local feedback so the panel doesn't wait on the network round-trip.
+  function optimistic(fn) {
+    if (!haveState) return; // don't show a wrong absolute count before we know it
+    fn();
+    render();
   }
 
   function setConn(state, text) {
@@ -184,17 +199,32 @@
       .catch(function () {});
   }
 
-  document.getElementById("makeBtn").onclick = function () { send("!make"); };
-  document.getElementById("missBtn").onclick = function () { send("!miss"); };
-  document.getElementById("undoBtn").onclick = function () { send("!undo"); };
+  document.getElementById("makeBtn").onclick = function () {
+    send("!make");
+    optimistic(function () { makes += 1; attempts += 1; });
+  };
+  document.getElementById("missBtn").onclick = function () {
+    send("!miss");
+    optimistic(function () { attempts += 1; });
+  };
+  document.getElementById("undoBtn").onclick = function () {
+    // can't safely guess the prior state, so wait for the overlay's broadcast
+    send("!undo");
+  };
 
   document.getElementById("setMakesBtn").onclick = function () {
     var v = document.getElementById("setMakesInput").value;
-    if (v !== "" && Number(v) >= 0) send("setmakes:" + parseInt(v, 10));
+    if (v === "" || Number(v) < 0) return;
+    var n = parseInt(v, 10);
+    send("setmakes:" + n);
+    optimistic(function () { makes = n; if (attempts < makes) attempts = makes; });
   };
   document.getElementById("setMissesBtn").onclick = function () {
     var v = document.getElementById("setMissesInput").value;
-    if (v !== "" && Number(v) >= 0) send("setmisses:" + parseInt(v, 10));
+    if (v === "" || Number(v) < 0) return;
+    var n = parseInt(v, 10);
+    send("setmisses:" + n);
+    optimistic(function () { attempts = makes + n; });
   };
 
   // ---- Read current state from the overlay ----
@@ -207,19 +237,23 @@
     } catch (e) {}
   }
 
-  // One-time poll on load so we show the current count immediately.
-  fetch("https://ntfy.sh/" + STATE_TOPIC + "/json?poll=1&since=all")
-    .then(function (r) { return r.text(); })
-    .then(function (t) {
-      var lines = t.split("\n");
-      var last = null;
-      for (var i = 0; i < lines.length; i++) {
-        if (!lines[i]) continue;
-        try { var o = JSON.parse(lines[i]); if (o.event === "message") last = o.message; } catch (e) {}
-      }
-      if (last) parseStateMessage(last);
-    })
-    .catch(function () {});
+  // Pull the overlay's current state (on load, after reconnects, and as a safety net).
+  function pollLatest() {
+    fetch("https://ntfy.sh/" + STATE_TOPIC + "/json?poll=1&since=all")
+      .then(function (r) { return r.text(); })
+      .then(function (t) {
+        var lines = t.split("\n");
+        var last = null;
+        for (var i = 0; i < lines.length; i++) {
+          if (!lines[i]) continue;
+          try { var o = JSON.parse(lines[i]); if (o.event === "message") last = o.message; } catch (e) {}
+        }
+        if (last) parseStateMessage(last);
+      })
+      .catch(function () {});
+  }
+  pollLatest();
+  setInterval(pollLatest, 15000); // gentle safety net in case a broadcast is missed
 
   // Live updates.
   var ws = null;
@@ -228,6 +262,7 @@
     ws = new WebSocket("wss://ntfy.sh/" + STATE_TOPIC + "/ws");
     ws.onopen = function () {
       delay = 1000;
+      pollLatest(); // resync after any reconnection gap
       setConn(haveState ? "live" : "waiting", haveState ? "live" : "waiting for overlay…");
     };
     ws.onmessage = function (event) {
