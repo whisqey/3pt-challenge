@@ -31,7 +31,7 @@
     padding: 28px 36px 32px;
     background: rgba(12, 14, 20, 0.82);
     border: 2px solid rgba(255, 122, 24, 0.55);
-    border-radius: 18px;
+    border-radius: 0;
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
     color: #fff;
     text-align: center;
@@ -71,12 +71,28 @@
     text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
   }
 
+  #pctRow {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
   #pct {
     font-size: 34px;
     font-weight: 800;
     color: var(--orange-bright);
-    margin-bottom: 18px;
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  }
+
+  #pctLabel {
+    font-size: 16px;
+    font-weight: 700;
+    color: #c8ccd6;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
   }
 
   /* Progress bar */
@@ -96,6 +112,24 @@
     border-radius: 14px;
     transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
     box-shadow: 0 0 14px rgba(255, 122, 24, 0.7);
+  }
+
+  /* Basketball riding the head of the progress fill */
+  #barWrap {
+    position: relative;
+    width: 100%;
+  }
+
+  #ball {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    width: 42px;
+    height: 42px;
+    transform: translate(-50%, -50%);
+    transition: left 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
   }
 
   #progressLabel {
@@ -130,8 +164,11 @@
       <span id="makes">0</span>
       <span id="attempts">/ 0 attempts</span>
     </div>
-    <div id="pct">0.0%</div>
-    <div id="barOuter"><div id="barInner"></div></div>
+    <div id="pctRow"><span id="pct">0.0%</span><span id="pctLabel">shot make percentage</span></div>
+    <div id="barWrap">
+      <div id="barOuter"><div id="barInner"></div></div>
+      <img id="ball" src="assets/bball.png" alt="">
+    </div>
     <div id="progressLabel">0 / 100 makes</div>
   </div>
 
@@ -158,6 +195,7 @@
   var elAttempts = document.getElementById("attempts");
   var elPct = document.getElementById("pct");
   var elBar = document.getElementById("barInner");
+  var elBall = document.getElementById("ball");
   var elProgress = document.getElementById("progressLabel");
   var elStatus = document.getElementById("status");
 
@@ -171,6 +209,7 @@
 
     var fill = Math.max(0, Math.min(100, (makes / GOAL) * 100));
     elBar.style.width = fill + "%";
+    elBall.style.left = fill + "%";
 
     elProgress.textContent = makes + " / " + GOAL + " makes";
   }
