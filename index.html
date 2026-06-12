@@ -107,59 +107,6 @@
     text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
   }
 
-  /* Milestone banner */
-  #milestone {
-    position: absolute;
-    top: -64px;
-    left: 50%;
-    transform: translateX(-50%) scale(0.8);
-    font-size: 30px;
-    font-weight: 900;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: #fff;
-    background: linear-gradient(90deg, var(--orange), var(--orange-bright));
-    padding: 10px 28px;
-    border-radius: 12px;
-    box-shadow: 0 6px 24px rgba(255, 122, 24, 0.8);
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  #milestone.show {
-    animation: milestonePop 3.2s ease forwards;
-  }
-
-  @keyframes milestonePop {
-    0%   { opacity: 0; transform: translateX(-50%) scale(0.6) translateY(10px); }
-    12%  { opacity: 1; transform: translateX(-50%) scale(1.08) translateY(0); }
-    20%  { transform: translateX(-50%) scale(1.0); }
-    85%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
-    100% { opacity: 0; transform: translateX(-50%) scale(0.9) translateY(-8px); }
-  }
-
-  /* Panel flash/glow effects */
-  #panel.flash {
-    animation: flashGlow 1.6s ease;
-  }
-  @keyframes flashGlow {
-    0%, 100% { box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6); border-color: rgba(255, 122, 24, 0.55); }
-    25%      { box-shadow: 0 0 60px rgba(255, 157, 61, 0.9); border-color: var(--orange-bright); }
-  }
-
-  #panel.bigCelebrate {
-    animation: bigCelebrate 4s ease;
-  }
-  @keyframes bigCelebrate {
-    0%, 100% { box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6); border-color: rgba(255, 122, 24, 0.55); transform: translateX(-50%) scale(1); }
-    10%      { box-shadow: 0 0 80px rgba(255, 200, 80, 1); border-color: #ffd24d; transform: translateX(-50%) scale(1.04); }
-    20%      { transform: translateX(-50%) scale(1); }
-    30%      { box-shadow: 0 0 80px rgba(255, 200, 80, 1); transform: translateX(-50%) scale(1.03); }
-    40%      { transform: translateX(-50%) scale(1); }
-    50%      { box-shadow: 0 0 80px rgba(255, 200, 80, 1); }
-  }
-
   /* Connection status dot (small, corner) */
   #status {
     position: absolute;
@@ -178,7 +125,6 @@
 <body>
   <div id="panel">
     <div id="status" class="disconnected" title="Twitch connection"></div>
-    <div id="milestone"></div>
     <div id="title">3PT Challenge</div>
     <div id="scoreRow">
       <span id="makes">0</span>
@@ -206,7 +152,6 @@
   var makes = 0;
   var attempts = 0;
   var history = []; // stack of {makes, attempts} snapshots BEFORE each action, for undo
-  var firedMilestones = {}; // track which milestones already fired
 
   // ---- DOM ----
   var elMakes = document.getElementById("makes");
@@ -214,8 +159,6 @@
   var elPct = document.getElementById("pct");
   var elBar = document.getElementById("barInner");
   var elProgress = document.getElementById("progressLabel");
-  var elMilestone = document.getElementById("milestone");
-  var elPanel = document.getElementById("panel");
   var elStatus = document.getElementById("status");
 
   // ---- Render ----
@@ -232,35 +175,6 @@
     elProgress.textContent = makes + " / " + GOAL + " makes";
   }
 
-  // ---- Milestones ----
-  var MILESTONES = {
-    25:  { text: "QUARTER WAY", type: "flash" },
-    50:  { text: "HALFWAY THERE", type: "big" },
-    75:  { text: "75 DOWN!", type: "flash" },
-    100: { text: "CHALLENGE COMPLETE", type: "celebrate" }
-  };
-
-  function checkMilestones() {
-    var cfg = MILESTONES[makes];
-    if (cfg && !firedMilestones[makes]) {
-      firedMilestones[makes] = true;
-      triggerMilestone(cfg);
-    }
-  }
-
-  function triggerMilestone(cfg) {
-    elMilestone.textContent = cfg.text;
-    // restart animation
-    elMilestone.classList.remove("show");
-    void elMilestone.offsetWidth;
-    elMilestone.classList.add("show");
-
-    var cls = cfg.type === "celebrate" ? "bigCelebrate" : "flash";
-    elPanel.classList.remove("flash", "bigCelebrate");
-    void elPanel.offsetWidth;
-    elPanel.classList.add(cls);
-  }
-
   // ---- Actions ----
   function pushHistory() {
     history.push({ makes: makes, attempts: attempts });
@@ -272,7 +186,6 @@
     makes += 1;
     attempts += 1;
     render();
-    checkMilestones();
   }
 
   function doMiss() {
@@ -286,10 +199,6 @@
     var prev = history.pop();
     makes = prev.makes;
     attempts = prev.attempts;
-    // allow milestones to re-fire if we dropped below them
-    for (var key in firedMilestones) {
-      if (makes < Number(key)) delete firedMilestones[key];
-    }
     render();
   }
 
@@ -297,7 +206,6 @@
     pushHistory();
     makes = val;
     if (attempts < makes) attempts = makes; // keep attempts >= makes
-    refreshMilestoneState();
     render();
   }
 
@@ -306,14 +214,6 @@
     // misses = attempts - makes  =>  attempts = makes + misses
     attempts = makes + val;
     render();
-  }
-
-  function refreshMilestoneState() {
-    // mark milestones at or below current makes as already fired (no replay on manual set)
-    for (var m in MILESTONES) {
-      if (Number(m) <= makes) firedMilestones[m] = true;
-      else delete firedMilestones[m];
-    }
   }
 
   // ---- Command parsing ----
@@ -465,7 +365,6 @@
           if (typeof st.makes === "number" && typeof st.attempts === "number") {
             makes = st.makes;
             attempts = st.attempts;
-            refreshMilestoneState(); // adopt without replaying milestone animations
             render();
           }
         } catch (e) {}
@@ -504,7 +403,6 @@
     // simulate ~75% shooting so the % and bar look realistic at the jump point
     makes = n;
     attempts = Math.max(n, Math.round(n / 0.75));
-    refreshMilestoneState();
     render();
   }
 
@@ -530,14 +428,14 @@
     bar.appendChild(btn("Miss", doMiss));
     bar.appendChild(btn("Undo", doUndo));
 
-    // jump to one-below each milestone so a single "Make" triggers that milestone
+    // quick jumps to sample the bar/percent at various fills
     bar.appendChild(btn("→ 24", function () { testJump(24); }));
     bar.appendChild(btn("→ 49", function () { testJump(49); }));
     bar.appendChild(btn("→ 74", function () { testJump(74); }));
     bar.appendChild(btn("→ 99", function () { testJump(99); }));
 
     bar.appendChild(btn("Reset", function () {
-      makes = 0; attempts = 0; history = []; firedMilestones = {}; render();
+      makes = 0; attempts = 0; history = []; render();
     }));
 
     var note = document.createElement("span");
