@@ -325,8 +325,9 @@
     if (lower === "!make") { doMake(); }
     else if (lower === "!miss") { doMiss(); }
     else if (lower === "!undo") { doUndo(); }
-    else if (/^setmakes:\s*(\d+)$/.test(lower)) { doSetMakes(parseInt(lower.match(/^setmakes:\s*(\d+)$/)[1], 10)); }
-    else if (/^setmisses:\s*(\d+)$/.test(lower)) { doSetMisses(parseInt(lower.match(/^setmisses:\s*(\d+)$/)[1], 10)); }
+    // Accepts: "setmakes:50", "!setmake 50", "!setmakes 50" (and miss equivalents)
+    else if (/^!?setmakes?[:\s]+(\d+)$/.test(lower)) { doSetMakes(parseInt(lower.match(/^!?setmakes?[:\s]+(\d+)$/)[1], 10)); }
+    else if (/^!?setmiss(?:es)?[:\s]+(\d+)$/.test(lower)) { doSetMisses(parseInt(lower.match(/^!?setmiss(?:es)?[:\s]+(\d+)$/)[1], 10)); }
     else { acted = false; }
 
     // After any real change, push the new state out so the control panel mirrors it.
