@@ -21,10 +21,10 @@
     font-family: "Segoe UI", Arial, Helvetica, sans-serif;
   }
 
-  /* Panel positioned bottom-center */
+  /* Panel positioned top-center */
   #panel {
     position: absolute;
-    bottom: 60px;
+    top: 60px;
     left: 50%;
     transform: translateX(-50%);
     width: 620px;
@@ -37,13 +37,9 @@
     text-align: center;
   }
 
+  /* Empty spacer preserving the gap the title used to occupy */
   #title {
-    font-size: 22px;
-    font-weight: 800;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--orange-bright);
-    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+    height: 26px;
     margin-bottom: 14px;
   }
 
@@ -141,25 +137,11 @@
     text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
   }
 
-  /* Connection status dot (small, corner) */
-  #status {
-    position: absolute;
-    top: 10px;
-    right: 14px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #888;
-    box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
-  }
-  #status.connected { background: #3ad17a; box-shadow: 0 0 8px #3ad17a; }
-  #status.disconnected { background: #d13a3a; box-shadow: 0 0 8px #d13a3a; }
 </style>
 </head>
 <body>
   <div id="panel">
-    <div id="status" class="disconnected" title="Twitch connection"></div>
-    <div id="title">3PT Challenge</div>
+    <div id="title"></div>
     <div id="scoreRow">
       <span id="makes">0</span>
       <span id="attempts">/ 0 attempts</span>
@@ -197,7 +179,6 @@
   var elBar = document.getElementById("barInner");
   var elBall = document.getElementById("ball");
   var elProgress = document.getElementById("progressLabel");
-  var elStatus = document.getElementById("status");
 
   // ---- Render ----
   function render() {
@@ -297,12 +278,7 @@
   var ws = null;
   var reconnectDelay = 1000;
 
-  function setStatus(state) {
-    elStatus.className = state;
-  }
-
   function connect() {
-    setStatus("disconnected");
     ws = new WebSocket("wss://irc-ws.chat.twitch.tv:443");
 
     ws.onopen = function () {
@@ -312,7 +288,6 @@
       ws.send("NICK justinfan" + Math.floor(Math.random() * 80000 + 1000));
       ws.send("JOIN #" + CHANNEL);
       reconnectDelay = 1000;
-      setStatus("connected");
     };
 
     ws.onmessage = function (event) {
@@ -325,7 +300,6 @@
     };
 
     ws.onclose = function () {
-      setStatus("disconnected");
       scheduleReconnect();
     };
 
